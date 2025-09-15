@@ -46,6 +46,9 @@
   - `uv run python scrape.py --resume`
 - 失敗銘柄を別CSVに出力
   - `uv run python scrape.py --failures failures.csv`
+- 失敗CSV名に自動でタイムスタンプを付与
+  - `uv run python scrape.py --failures-auto`（例: failures_YYYYMMDD_HHMM.csv）
+  - 任意名に付与: `uv run python scrape.py --failures errors.csv --failures-auto` → errors_YYYYMMDD_HHMM.csv
 - 既存の出力に追記（ヘッダ重複なし）
   - `uv run python scrape.py --append`
 - 失敗CSVからの再実行（前回失敗分のみ）
@@ -79,6 +82,7 @@
 - `--verbose`: 詳細ログを有効化（リトライの詳細など）
 - `--from-failures`: 失敗CSV（`code` 列必須）から入力コードを読み込み、該当銘柄のみ再実行
 - `--headed` / `--headless`: ブラウザUIの表示切替（既定はヘッドレス）
+- `--failures-auto`: 失敗CSVのファイル名に日時サフィックスを自動付与
 - `--timeout`: 操作のデフォルトタイムアウト（ミリ秒、既定: 20000）
 - `--nav-timeout`: ナビゲーションのタイムアウト（ミリ秒、既定: 20000）
 - `--user-agent`: 使用するUser-Agent文字列

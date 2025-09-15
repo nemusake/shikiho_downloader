@@ -40,6 +40,9 @@
   - `uv run python scrape.py --resume`
 - 失敗銘柄の一覧をCSV出力（`code,reason`）
   - `uv run python scrape.py --failures failures.csv`
+- 失敗CSV名に自動でタイムスタンプを付与
+  - `uv run python scrape.py --failures-auto`（例: failures_YYYYMMDD_HHMM.csv）
+  - 任意名に付与: `uv run python scrape.py --failures errors.csv --failures-auto`
 - 既存出力へ追記（ヘッダ重複なし）
   - `uv run python scrape.py --append`
 - 失敗CSVからの再実行（前回失敗分のみ）
@@ -78,6 +81,7 @@
 - `--user-agent`: 使用するUser-Agent文字列
 - `--fields`: 出力する列（カンマ区切り）。既定は全項目
 - `--max-industries`: 所属業界の最大件数（0で無制限、既定: 3）
+- `--failures-auto`: 失敗CSVに日時サフィックスを自動付与
 
 ## 4. 出力仕様
 - 出力ファイル: `result.csv`

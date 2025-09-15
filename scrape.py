@@ -399,6 +399,11 @@ def main():
     )
     # Failure tracking and resume/append
     parser.add_argument("--failures", default="", help="path to write failed codes CSV (code,reason). empty=disable")
+    parser.add_argument(
+        "--failures-auto",
+        action="store_true",
+        help="auto-append timestamp suffix to failures CSV; if --failures is empty, create failures_YYYYMMDD_HHMM.csv",
+    )
     parser.add_argument("--resume", action="store_true", help="skip codes already present in --output")
     parser.add_argument("--append", action="store_true", help="append to --output if it exists (no header)")
     parser.add_argument("--verbose", action="store_true", help="enable more verbose logs")
@@ -480,6 +485,7 @@ def main():
     out_exists = os.path.exists(args.output)
     out_mode = "a" if (args.append and out_exists) else "w"
     # Excelなどでの文字化け回避のためUTF-8 BOM付きで出力
+    chosen_fail_path = ""
     with open(args.output, out_mode, encoding="utf-8-sig", newline="") as fo:
         writer = csv.DictWriter(fo, fieldnames=fieldnames, extrasaction="ignore")
         if out_mode == "w":
@@ -488,16 +494,32 @@ def main():
         # Failures CSV writer (optional)
         fail_writer = None
         fail_fp = None
-        if args.failures:
+        if args.failures or args.failures_auto:
             try:
-                fail_exists = os.path.exists(args.failures)
+                # Decide path
+                path = args.failures
+                if args.failures_auto:
+                    ts = time.strftime("%Y%m%d_%H%M")
+                    if path:
+                        root, ext = os.path.splitext(path)
+                        if not ext:
+                            ext = ".csv"
+                        path = f"{root}_{ts}{ext}"
+                    else:
+                        path = f"failures_{ts}.csv"
+                chosen_fail_path = path
+
+                fail_exists = os.path.exists(path)
                 fail_mode = "a" if fail_exists else "w"
-                fail_fp = open(args.failures, fail_mode, encoding="utf-8-sig", newline="")
+                fail_fp = open(path, fail_mode, encoding="utf-8-sig", newline="")
                 fail_writer = csv.DictWriter(fail_fp, fieldnames=["code", "reason"])
                 if fail_mode == "w":
                     fail_writer.writeheader()
+                if args.verbose:
+                    print(f"[INFO] failures CSV: {path}", file=sys.stderr)
             except Exception as e:
-                print(f"[WARN] cannot open failures CSV '{args.failures}': {e}", file=sys.stderr)
+                target = args.failures or chosen_fail_path or "(auto failures path)"
+                print(f"[WARN] cannot open failures CSV '{target}': {e}", file=sys.stderr)
 
         start_ts = time.time()
         with sync_playwright() as p:
@@ -599,8 +621,8 @@ def main():
             print(f"[DONE] Completed with failures: {len(failures)} codes -> {detail}", file=sys.stderr)
         else:
             print(f"[DONE] Completed with failures: {len(failures)} codes", file=sys.stderr)
-        if args.failures:
-            print(f"[INFO] failure list written to: {args.failures}", file=sys.stderr)
+        if chosen_fail_path:
+            print(f"[INFO] failure list written to: {chosen_fail_path}", file=sys.stderr)
     else:
         print("[DONE] Completed successfully", file=sys.stderr)
 
