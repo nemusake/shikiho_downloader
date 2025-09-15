@@ -6,10 +6,11 @@
 - 管理: uv（Pythonの実行・依存管理に使用）
 - 依存: Playwright（Chromium）
 - 取得対象URL: `https://shikiho.toyokeizai.net/stocks/{code}`
+- Python 3.9+（本プロジェクトは 3.9 で動作確認）
 
 ## 2. 初回セットアップ
 1) ブラウザのインストール（初回のみ）
-- `uv run --python 3.11 python -m playwright install chromium`
+- `uv run python -m playwright install chromium`
 
 2) 入力CSVの準備
 - ファイル: `codelist.csv`

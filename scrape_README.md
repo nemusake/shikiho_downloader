@@ -9,10 +9,11 @@
 ## 前提
 - パッケージ管理: uv（AGENTS.md準拠）
 - 依存は `pyproject.toml` に定義済み（`playwright`）
+- Python 3.9+（本プロジェクトは 3.9 で動作確認）
 
 ## 初回セットアップ
 - Chromiumのインストール（初回のみ）
-  - `uv run --python 3.11 python -m playwright install chromium`
+  - `uv run python -m playwright install chromium`
 
 ## 実行方法
 - 1件だけ検証
@@ -22,12 +23,6 @@
 - 全件（`codelist.csv` 全コード）
   - 標準: `uv run python scrape.py --sleep 1.0`
   - サイト負荷配慮（推奨例）: `uv run python scrape.py --sleep 5.0`
-
-### 画面表示の有無（ヘッドレス切替）
-- デバッグ用にブラウザUIを表示（非ヘッドレス）
-  - `uv run python scrape.py --headed --limit 1 --verbose`
-- 既定はヘッドレス（明示する場合）
-  - `uv run python scrape.py --headless`
 
 ### 画面表示の有無（ヘッドレス切替）
 - デバッグ用にブラウザUIを表示（非ヘッドレス）
