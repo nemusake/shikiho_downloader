@@ -13,6 +13,7 @@ __pycache__/
 # Scraping outputs
 result.csv
 result - summary.csv
+failures*.csv
 
 # Playwright caches (if any local)
 playwright/.cache/

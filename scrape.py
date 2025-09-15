@@ -1,4 +1,6 @@
 import csv
+import os
+import random
 import re
 import sys
 import time
@@ -9,6 +11,10 @@ from playwright.sync_api import TimeoutError as PWTimeoutError, sync_playwright
 
 TARGET_URL = "https://shikiho.toyokeizai.net/stocks/{code}"
 MARKET_REGEX = re.compile(r"(東証(?:プライム|スタンダード|グロース))")
+
+
+class NonRetryableError(Exception):
+    pass
 
 
 def read_codes(csv_path: str) -> List[str]:
@@ -328,7 +334,14 @@ def scrape_one(page, code: str) -> Dict[str, str]:
     url = TARGET_URL.format(code=code)
     page.set_default_timeout(20000)
     page.set_default_navigation_timeout(20000)
-    page.goto(url, wait_until="networkidle")
+    resp = page.goto(url, wait_until="networkidle")
+    try:
+        status = resp.status if resp else None
+    except Exception:
+        status = None
+    # 404/410 は恒久的エラーとみなしリトライしない
+    if status in (404, 410):
+        raise NonRetryableError(f"HTTP {status} for code {code}")
 
     # 既知のモーダル等があれば閉じる（失敗しても続行）
     for sel in ["#tpModal .pi_close", "button:has-text('同意')", "button:has-text('OK')", "[aria-label='close']"]:
@@ -352,12 +365,54 @@ def main():
     parser.add_argument("--output", default="result.csv", help="output CSV path")
     parser.add_argument("--sleep", type=float, default=1.0, help="sleep seconds between requests")
     parser.add_argument("--limit", type=int, default=0, help="limit number of codes (0=all)")
+    # Retry/jitter options (defaults keep current behavior: disabled)
+    parser.add_argument("--retries", type=int, default=0, help="number of retries on transient failures")
+    parser.add_argument(
+        "--retry-base", type=float, default=1.0, help="base seconds for exponential backoff"
+    )
+    parser.add_argument(
+        "--retry-factor", type=float, default=1.6, help="multiplicative factor for backoff"
+    )
+    parser.add_argument(
+        "--retry-max", type=float, default=15.0, help="maximum backoff per attempt (seconds)"
+    )
+    parser.add_argument(
+        "--jitter-frac", type=float, default=0.0, help="fractional jitter for --sleep (e.g., 0.3 => ±30%)"
+    )
+    # Failure tracking and resume/append
+    parser.add_argument("--failures", default="", help="path to write failed codes CSV (code,reason). empty=disable")
+    parser.add_argument("--resume", action="store_true", help="skip codes already present in --output")
+    parser.add_argument("--append", action="store_true", help="append to --output if it exists (no header)")
+    parser.add_argument("--verbose", action="store_true", help="enable more verbose logs")
+    parser.add_argument(
+        "--from-failures",
+        default="",
+        help="read input codes from a failures CSV (uses 'code' column) instead of --input",
+    )
     args = parser.parse_args()
 
     try:
-        codes = read_codes(args.input)
+        if args.from_failures:
+            # Read codes from failures CSV (expects a 'code' header; ignores 'reason')
+            codes: List[str] = []
+            with open(args.from_failures, "r", encoding="utf-8-sig", newline="") as f:
+                r = csv.DictReader(f)
+                if not r.fieldnames or "code" not in r.fieldnames:
+                    raise ValueError("failures CSV must have a 'code' header")
+                seen = set()
+                for row in r:
+                    c = (row.get("code") or "").strip()
+                    if not c or c in seen:
+                        continue
+                    seen.add(c)
+                    codes.append(c)
+            if args.verbose:
+                print(f"[INFO] loaded {len(codes)} codes from failures: {args.from_failures}", file=sys.stderr)
+        else:
+            codes = read_codes(args.input)
     except Exception as e:
-        print(f"[ERROR] failed to read {args.input}: {e}", file=sys.stderr)
+        src = args.from_failures or args.input
+        print(f"[ERROR] failed to read {src}: {e}", file=sys.stderr)
         sys.exit(1)
 
     if args.limit > 0:
@@ -374,11 +429,45 @@ def main():
     ]
 
     failures: List[str] = []
+    processed: List[str] = []
 
+    # Resume support: load already processed codes from existing output
+    if args.resume and os.path.exists(args.output):
+        try:
+            with open(args.output, "r", encoding="utf-8-sig", newline="") as fr:
+                r = csv.DictReader(fr)
+                if "code" in (r.fieldnames or []):
+                    for row in r:
+                        c = (row.get("code") or "").strip()
+                        if c:
+                            processed.append(c)
+            if args.verbose:
+                print(f"[INFO] resume enabled: {len(processed)} codes already processed", file=sys.stderr)
+        except Exception as e:
+            print(f"[WARN] failed to read existing output for resume: {e}", file=sys.stderr)
+
+    # Configure output writer (append or write)
+    out_exists = os.path.exists(args.output)
+    out_mode = "a" if (args.append and out_exists) else "w"
     # Excelなどでの文字化け回避のためUTF-8 BOM付きで出力
-    with open(args.output, "w", encoding="utf-8-sig", newline="") as fo:
+    with open(args.output, out_mode, encoding="utf-8-sig", newline="") as fo:
         writer = csv.DictWriter(fo, fieldnames=fieldnames)
-        writer.writeheader()
+        if out_mode == "w":
+            writer.writeheader()
+
+        # Failures CSV writer (optional)
+        fail_writer = None
+        fail_fp = None
+        if args.failures:
+            try:
+                fail_exists = os.path.exists(args.failures)
+                fail_mode = "a" if fail_exists else "w"
+                fail_fp = open(args.failures, fail_mode, encoding="utf-8-sig", newline="")
+                fail_writer = csv.DictWriter(fail_fp, fieldnames=["code", "reason"])
+                if fail_mode == "w":
+                    fail_writer.writeheader()
+            except Exception as e:
+                print(f"[WARN] cannot open failures CSV '{args.failures}': {e}", file=sys.stderr)
 
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
@@ -392,23 +481,93 @@ def main():
             page = context.new_page()
 
             for i, code in enumerate(codes, 1):
+                if args.resume and code in processed:
+                    if args.verbose:
+                        print(f"[{i}/{len(codes)}] Skip {code} (resume)", file=sys.stderr)
+                    continue
                 print(f"[{i}/{len(codes)}] Fetching {code}...", file=sys.stderr)
-                try:
-                    record = scrape_one(page, code)
-                    writer.writerow(record)
-                except PWTimeoutError:
-                    print(f"[WARN] timeout for code {code}", file=sys.stderr)
-                    failures.append(code)
-                except Exception as e:
-                    print(f"[WARN] error for code {code}: {e}", file=sys.stderr)
-                    failures.append(code)
-                time.sleep(max(0.0, args.sleep))
+                attempt = 0
+                while True:
+                    try:
+                        record = scrape_one(page, code)
+                        writer.writerow(record)
+                        break
+                    except NonRetryableError as e:
+                        print(f"[WARN] non-retryable for {code}: {e}", file=sys.stderr)
+                        failures.append(code)
+                        if fail_writer:
+                            try:
+                                fail_writer.writerow({"code": code, "reason": str(e)})
+                            except Exception:
+                                pass
+                        break
+                    except PWTimeoutError:
+                        if attempt < args.retries:
+                            # exponential backoff with full jitter
+                            base = args.retry_base * (args.retry_factor ** attempt)
+                            wait = min(args.retry_max, base)
+                            jitter = random.uniform(0.0, wait)
+                            msg = f"[RETRY] timeout for {code}, attempt {attempt+1}/{args.retries}, wait {jitter:.2f}s"
+                            if args.verbose:
+                                print(msg, file=sys.stderr)
+                            time.sleep(jitter)
+                            attempt += 1
+                            continue
+                        print(f"[WARN] timeout for code {code}", file=sys.stderr)
+                        failures.append(code)
+                        if fail_writer:
+                            try:
+                                fail_writer.writerow({"code": code, "reason": "timeout"})
+                            except Exception:
+                                pass
+                        break
+                    except Exception as e:
+                        if attempt < args.retries:
+                            base = args.retry_base * (args.retry_factor ** attempt)
+                            wait = min(args.retry_max, base)
+                            jitter = random.uniform(0.0, wait)
+                            if args.verbose:
+                                print(
+                                    f"[RETRY] error for {code}: {e}, attempt {attempt+1}/{args.retries}, wait {jitter:.2f}s",
+                                    file=sys.stderr,
+                                )
+                            time.sleep(jitter)
+                            attempt += 1
+                            continue
+                        print(f"[WARN] error for code {code}: {e}", file=sys.stderr)
+                        failures.append(code)
+                        if fail_writer:
+                            try:
+                                fail_writer.writerow({"code": code, "reason": str(e)})
+                            except Exception:
+                                pass
+                        break
+
+                # baseline sleep with optional jitter
+                if args.jitter_frac > 0:
+                    jf = max(0.0, args.jitter_frac)
+                    delta = args.sleep * random.uniform(-jf, jf)
+                    time.sleep(max(0.0, args.sleep + delta))
+                else:
+                    time.sleep(max(0.0, args.sleep))
 
             context.close()
             browser.close()
 
+        if fail_fp:
+            try:
+                fail_fp.close()
+            except Exception:
+                pass
+
     if failures:
-        print(f"[DONE] Completed with failures: {len(failures)} codes -> {', '.join(failures)}", file=sys.stderr)
+        if len(failures) <= 20:
+            detail = ", ".join(failures)
+            print(f"[DONE] Completed with failures: {len(failures)} codes -> {detail}", file=sys.stderr)
+        else:
+            print(f"[DONE] Completed with failures: {len(failures)} codes", file=sys.stderr)
+        if args.failures:
+            print(f"[INFO] failure list written to: {args.failures}", file=sys.stderr)
     else:
         print("[DONE] Completed successfully", file=sys.stderr)
 
