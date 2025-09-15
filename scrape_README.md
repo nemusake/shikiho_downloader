@@ -29,6 +29,12 @@
 - 既定はヘッドレス（明示する場合）
   - `uv run python scrape.py --headless`
 
+### 画面表示の有無（ヘッドレス切替）
+- デバッグ用にブラウザUIを表示（非ヘッドレス）
+  - `uv run python scrape.py --headed --limit 1 --verbose`
+- 既定はヘッドレス（明示する場合）
+  - `uv run python scrape.py --headless`
+
 ### リトライ・ジッター付きの例
 - 軽めの再試行とスリープに±30%ジッター
   - `uv run python scrape.py --sleep 2.0 --retries 2 --jitter-frac 0.3`
@@ -44,6 +50,12 @@
   - `uv run python scrape.py --append`
 - 失敗CSVからの再実行（前回失敗分のみ）
   - `uv run python scrape.py --from-failures failures.csv --append`
+
+### タイムアウトやUAの調整
+- ナビゲーション/操作のタイムアウトを延長（ミリ秒）
+  - `uv run python scrape.py --nav-timeout 40000 --timeout 40000`
+- User-Agent を変更
+  - `uv run python scrape.py --user-agent "Mozilla/5.0 ... Chrome/124.0.0.0 Safari/537.36"`
 
 ### 主なオプション
 - `--input`: 入力CSVパス（デフォルト: `codelist.csv`、UTF-8 BOM付、ヘッダ`code`必須）
@@ -61,6 +73,9 @@
 - `--verbose`: 詳細ログを有効化（リトライの詳細など）
 - `--from-failures`: 失敗CSV（`code` 列必須）から入力コードを読み込み、該当銘柄のみ再実行
 - `--headed` / `--headless`: ブラウザUIの表示切替（既定はヘッドレス）
+- `--timeout`: 操作のデフォルトタイムアウト（ミリ秒、既定: 20000）
+- `--nav-timeout`: ナビゲーションのタイムアウト（ミリ秒、既定: 20000）
+- `--user-agent`: 使用するUser-Agent文字列
 
 ## 入出力仕様
 - 入力CSV: `codelist.csv`

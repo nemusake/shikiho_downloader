@@ -45,6 +45,12 @@
 - 失敗CSVからの再実行（前回失敗分のみ）
   - `uv run python scrape.py --from-failures failures.csv --append`
 
+タイムアウトやUAの調整
+- ナビゲーション/操作のタイムアウトを延長（ミリ秒）
+  - `uv run python scrape.py --nav-timeout 40000 --timeout 40000`
+- User-Agent を変更
+  - `uv run python scrape.py --user-agent "Mozilla/5.0 ... Chrome/124.0.0.0 Safari/537.36"`
+
 主なオプション
 - `--input`: 入力CSV（既定: `codelist.csv`）
 - `--output`: 出力CSV（既定: `result.csv`）
@@ -61,6 +67,9 @@
 - `--verbose`: 詳細ログ（リトライ詳細等）
 - `--from-failures`: 失敗CSV（`code` 列）から対象銘柄のみ再実行
 - `--headed` / `--headless`: ブラウザUIの表示切替（既定はヘッドレス）
+- `--timeout`: 操作のデフォルトタイムアウト（ミリ秒、既定: 20000）
+- `--nav-timeout`: ナビゲーションのタイムアウト（ミリ秒、既定: 20000）
+- `--user-agent`: 使用するUser-Agent文字列
 
 ## 4. 出力仕様
 - 出力ファイル: `result.csv`

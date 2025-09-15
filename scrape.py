@@ -332,8 +332,6 @@ def extract_fields(page) -> Dict[str, str]:
 
 def scrape_one(page, code: str) -> Dict[str, str]:
     url = TARGET_URL.format(code=code)
-    page.set_default_timeout(20000)
-    page.set_default_navigation_timeout(20000)
     resp = page.goto(url, wait_until="networkidle")
     try:
         status = resp.status if resp else None
@@ -365,6 +363,18 @@ def main():
     parser.add_argument("--output", default="result.csv", help="output CSV path")
     parser.add_argument("--sleep", type=float, default=1.0, help="sleep seconds between requests")
     parser.add_argument("--limit", type=int, default=0, help="limit number of codes (0=all)")
+    # Timeouts and UA
+    parser.add_argument("--timeout", type=int, default=20000, help="default action timeout in milliseconds")
+    parser.add_argument("--nav-timeout", type=int, default=20000, help="navigation timeout in milliseconds")
+    parser.add_argument(
+        "--user-agent",
+        default=(
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/120.0.0.0 Safari/537.36"
+        ),
+        help="custom User-Agent string",
+    )
     # Retry/jitter options (defaults keep current behavior: disabled)
     parser.add_argument("--retries", type=int, default=0, help="number of retries on transient failures")
     parser.add_argument(
@@ -475,14 +485,14 @@ def main():
 
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=args.headless)
-            context = browser.new_context(
-                user_agent=(
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/120.0.0.0 Safari/537.36"
-                ),
-            )
+            context = browser.new_context(user_agent=args.user_agent)
             page = context.new_page()
+            # apply timeouts once per page
+            try:
+                page.set_default_timeout(args.timeout)
+                page.set_default_navigation_timeout(args.nav_timeout)
+            except Exception:
+                pass
 
             for i, code in enumerate(codes, 1):
                 if args.resume and code in processed:
