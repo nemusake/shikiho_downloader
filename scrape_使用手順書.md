@@ -24,6 +24,11 @@
 - 全件実行（推奨スリープ例 5秒）
   - `uv run python scrape.py --sleep 5.0`
 
+ブラウザ表示の切替（デバッグ向け）
+- UI表示（非ヘッドレス）で挙動確認
+  - `uv run python scrape.py --headed --limit 1 --verbose`
+※ 既定はヘッドレス。明示する場合は `--headless`
+
 リトライ・ジッター付きの例
 - 軽めの再試行＋スリープに±30%ジッター
   - `uv run python scrape.py --sleep 2.0 --retries 2 --jitter-frac 0.3`
@@ -55,6 +60,7 @@
 - `--append`: 既存 `--output` に追記（無ければ新規作成）
 - `--verbose`: 詳細ログ（リトライ詳細等）
 - `--from-failures`: 失敗CSV（`code` 列）から対象銘柄のみ再実行
+- `--headed` / `--headless`: ブラウザUIの表示切替（既定はヘッドレス）
 
 ## 4. 出力仕様
 - 出力ファイル: `result.csv`

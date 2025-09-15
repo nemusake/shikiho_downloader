@@ -389,6 +389,10 @@ def main():
         default="",
         help="read input codes from a failures CSV (uses 'code' column) instead of --input",
     )
+    # Browser mode
+    parser.add_argument("--headed", dest="headless", action="store_false", help="run with browser UI (non-headless)")
+    parser.add_argument("--headless", dest="headless", action="store_true", help="run headless (default)")
+    parser.set_defaults(headless=True)
     args = parser.parse_args()
 
     try:
@@ -470,7 +474,7 @@ def main():
                 print(f"[WARN] cannot open failures CSV '{args.failures}': {e}", file=sys.stderr)
 
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
+            browser = p.chromium.launch(headless=args.headless)
             context = browser.new_context(
                 user_agent=(
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "

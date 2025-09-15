@@ -23,6 +23,12 @@
   - 標準: `uv run python scrape.py --sleep 1.0`
   - サイト負荷配慮（推奨例）: `uv run python scrape.py --sleep 5.0`
 
+### 画面表示の有無（ヘッドレス切替）
+- デバッグ用にブラウザUIを表示（非ヘッドレス）
+  - `uv run python scrape.py --headed --limit 1 --verbose`
+- 既定はヘッドレス（明示する場合）
+  - `uv run python scrape.py --headless`
+
 ### リトライ・ジッター付きの例
 - 軽めの再試行とスリープに±30%ジッター
   - `uv run python scrape.py --sleep 2.0 --retries 2 --jitter-frac 0.3`
@@ -54,6 +60,7 @@
 - `--append`: 既存 `--output` に追記（無ければ新規作成しヘッダ出力）
 - `--verbose`: 詳細ログを有効化（リトライの詳細など）
 - `--from-failures`: 失敗CSV（`code` 列必須）から入力コードを読み込み、該当銘柄のみ再実行
+- `--headed` / `--headless`: ブラウザUIの表示切替（既定はヘッドレス）
 
 ## 入出力仕様
 - 入力CSV: `codelist.csv`
