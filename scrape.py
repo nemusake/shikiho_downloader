@@ -444,6 +444,8 @@ def main():
 
     failures: List[str] = []
     processed: List[str] = []
+    skipped_count = 0
+    success_count = 0
 
     # Resume support: load already processed codes from existing output
     if args.resume and os.path.exists(args.output):
@@ -483,6 +485,7 @@ def main():
             except Exception as e:
                 print(f"[WARN] cannot open failures CSV '{args.failures}': {e}", file=sys.stderr)
 
+        start_ts = time.time()
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=args.headless)
             context = browser.new_context(user_agent=args.user_agent)
@@ -498,6 +501,7 @@ def main():
                 if args.resume and code in processed:
                     if args.verbose:
                         print(f"[{i}/{len(codes)}] Skip {code} (resume)", file=sys.stderr)
+                    skipped_count += 1
                     continue
                 print(f"[{i}/{len(codes)}] Fetching {code}...", file=sys.stderr)
                 attempt = 0
@@ -505,6 +509,7 @@ def main():
                     try:
                         record = scrape_one(page, code)
                         writer.writerow(record)
+                        success_count += 1
                         break
                     except NonRetryableError as e:
                         print(f"[WARN] non-retryable for {code}: {e}", file=sys.stderr)
@@ -584,6 +589,17 @@ def main():
             print(f"[INFO] failure list written to: {args.failures}", file=sys.stderr)
     else:
         print("[DONE] Completed successfully", file=sys.stderr)
+
+    # Final summary line (last line)
+    elapsed = time.time() - start_ts
+    h = int(elapsed // 3600)
+    m = int((elapsed % 3600) // 60)
+    s = int(elapsed % 60)
+    total = len(codes)
+    print(
+        f"[SUMMARY] success={success_count}, failure={len(failures)}, skipped={skipped_count}, total={total}, elapsed={h:02d}:{m:02d}:{s:02d}",
+        file=sys.stderr,
+    )
 
 
 if __name__ == "__main__":
