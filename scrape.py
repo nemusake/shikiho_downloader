@@ -38,7 +38,7 @@ def normalize_text(s: Optional[str]) -> str:
     return re.sub(r"\s+", " ", s).strip()
 
 
-def extract_fields(page) -> Dict[str, str]:
+def extract_fields(page, max_industries: int = 3) -> Dict[str, str]:
     # 企業名: 見出しから推定
     company_name = ""
     for sel in [
@@ -257,8 +257,8 @@ def extract_fields(page) -> Dict[str, str]:
     # 比較会社名を除外（後でテーマ語も除外し、最後に文字列化する）
     industries_items = [x for x in industries_items if x not in comp_names]
     # 先頭の少数カテゴリに限定（ノイズ防止）
-    if len(industries_items) > 3:
-        industries_items = industries_items[:3]
+    if max_industries is not None and max_industries > 0 and len(industries_items) > max_industries:
+        industries_items = industries_items[:max_industries]
     industries = ""  # finalize after themes filtering
 
     themes_list = dt_items("市場テーマ", stop_text="比較会社")
@@ -330,7 +330,7 @@ def extract_fields(page) -> Dict[str, str]:
     }
 
 
-def scrape_one(page, code: str) -> Dict[str, str]:
+def scrape_one(page, code: str, max_industries: int = 3) -> Dict[str, str]:
     url = TARGET_URL.format(code=code)
     resp = page.goto(url, wait_until="networkidle")
     try:
@@ -350,7 +350,7 @@ def scrape_one(page, code: str) -> Dict[str, str]:
         except Exception:
             pass
 
-    fields = extract_fields(page)
+    fields = extract_fields(page, max_industries=max_industries)
     fields.update({"code": code})
     return fields
 
@@ -363,6 +363,14 @@ def main():
     parser.add_argument("--output", default="result.csv", help="output CSV path")
     parser.add_argument("--sleep", type=float, default=1.0, help="sleep seconds between requests")
     parser.add_argument("--limit", type=int, default=0, help="limit number of codes (0=all)")
+    parser.add_argument(
+        "--max-industries", type=int, default=3, help="maximum number of industries to keep (0=unlimited)"
+    )
+    parser.add_argument(
+        "--fields",
+        default="code,company_name,market,feature,business_composition,industries,themes",
+        help="comma-separated output fields (default: all)",
+    )
     # Timeouts and UA
     parser.add_argument("--timeout", type=int, default=20000, help="default action timeout in milliseconds")
     parser.add_argument("--nav-timeout", type=int, default=20000, help="navigation timeout in milliseconds")
@@ -432,7 +440,7 @@ def main():
     if args.limit > 0:
         codes = codes[: args.limit]
 
-    fieldnames = [
+    default_fields = [
         "code",
         "company_name",
         "market",
@@ -441,6 +449,12 @@ def main():
         "industries",
         "themes",
     ]
+    # Build fieldnames from --fields
+    raw_fields = [f.strip() for f in args.fields.split(",") if f.strip()]
+    allowed = set(default_fields)
+    fieldnames = [f for f in raw_fields if f in allowed] or default_fields
+    if "code" not in fieldnames:
+        fieldnames.insert(0, "code")
 
     failures: List[str] = []
     processed: List[str] = []
@@ -467,7 +481,7 @@ def main():
     out_mode = "a" if (args.append and out_exists) else "w"
     # Excelなどでの文字化け回避のためUTF-8 BOM付きで出力
     with open(args.output, out_mode, encoding="utf-8-sig", newline="") as fo:
-        writer = csv.DictWriter(fo, fieldnames=fieldnames)
+        writer = csv.DictWriter(fo, fieldnames=fieldnames, extrasaction="ignore")
         if out_mode == "w":
             writer.writeheader()
 
@@ -507,7 +521,7 @@ def main():
                 attempt = 0
                 while True:
                     try:
-                        record = scrape_one(page, code)
+                        record = scrape_one(page, code, max_industries=args.max_industries if args.max_industries > 0 else 999999)
                         writer.writerow(record)
                         success_count += 1
                         break

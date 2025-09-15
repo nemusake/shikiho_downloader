@@ -51,6 +51,12 @@
 - 失敗CSVからの再実行（前回失敗分のみ）
   - `uv run python scrape.py --from-failures failures.csv --append`
 
+### 出力項目と業界数の制御
+- 出力項目を絞る（code, company_name, market のみ）
+  - `uv run python scrape.py --fields code,company_name,market`
+- 所属業界の最大件数を変更（上限5件）
+  - `uv run python scrape.py --max-industries 5`
+
 ### タイムアウトやUAの調整
 - ナビゲーション/操作のタイムアウトを延長（ミリ秒）
   - `uv run python scrape.py --nav-timeout 40000 --timeout 40000`
@@ -76,6 +82,8 @@
 - `--timeout`: 操作のデフォルトタイムアウト（ミリ秒、既定: 20000）
 - `--nav-timeout`: ナビゲーションのタイムアウト（ミリ秒、既定: 20000）
 - `--user-agent`: 使用するUser-Agent文字列
+- `--fields`: 出力する列をカンマ区切りで指定（既定は全項目）
+- `--max-industries`: 所属業界の最大件数（0で無制限、既定: 3）
 
 ## 入出力仕様
 - 入力CSV: `codelist.csv`
