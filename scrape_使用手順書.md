@@ -60,6 +60,10 @@
 - User-Agent を変更
   - `uv run python scrape.py --user-agent "Mozilla/5.0 ... Chrome/124.0.0.0 Safari/537.36"`
 
+進捗とETAの表示
+- N件ごとに進捗と推定残り時間（ETA）を表示（例: 20件ごと）
+  - `uv run python scrape.py --eta-interval 20`
+
 主なオプション
 - `--input`: 入力CSV（既定: `codelist.csv`）
 - `--output`: 出力CSV（既定: `result.csv`）
@@ -82,6 +86,7 @@
 - `--fields`: 出力する列（カンマ区切り）。既定は全項目
 - `--max-industries`: 所属業界の最大件数（0で無制限、既定: 3）
 - `--failures-auto`: 失敗CSVに日時サフィックスを自動付与
+- `--eta-interval`: N件ごとに進捗とETAを表示（0で無効）
 
 ## 4. 出力仕様
 - 出力ファイル: `result.csv`

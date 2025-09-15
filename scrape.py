@@ -371,6 +371,12 @@ def main():
         default="code,company_name,market,feature,business_composition,industries,themes",
         help="comma-separated output fields (default: all)",
     )
+    parser.add_argument(
+        "--eta-interval",
+        type=int,
+        default=0,
+        help="print progress and ETA every N items (0=disabled)",
+    )
     # Timeouts and UA
     parser.add_argument("--timeout", type=int, default=20000, help="default action timeout in milliseconds")
     parser.add_argument("--nav-timeout", type=int, default=20000, help="navigation timeout in milliseconds")
@@ -605,6 +611,20 @@ def main():
                     time.sleep(max(0.0, args.sleep + delta))
                 else:
                     time.sleep(max(0.0, args.sleep))
+
+                # progress ETA output
+                if args.eta_interval and args.eta_interval > 0:
+                    if (i % args.eta_interval == 0) or (i == len(codes)):
+                        elapsed_so_far = time.time() - start_ts
+                        avg = elapsed_so_far / max(1, i)
+                        remaining = max(0.0, (len(codes) - i) * avg)
+                        eh = int(remaining // 3600)
+                        em = int((remaining % 3600) // 60)
+                        es = int(remaining % 60)
+                        print(
+                            f"[ETA] {i}/{len(codes)} avg={avg:.2f}s eta={eh:02d}:{em:02d}:{es:02d}",
+                            file=sys.stderr,
+                        )
 
             context.close()
             browser.close()
