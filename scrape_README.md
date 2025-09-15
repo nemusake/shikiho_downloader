@@ -23,11 +23,37 @@
   - 標準: `uv run python scrape.py --sleep 1.0`
   - サイト負荷配慮（推奨例）: `uv run python scrape.py --sleep 5.0`
 
+### リトライ・ジッター付きの例
+- 軽めの再試行とスリープに±30%ジッター
+  - `uv run python scrape.py --sleep 2.0 --retries 2 --jitter-frac 0.3`
+- バックオフを強める（指数バックオフ: base=1.5, factor=2.0, max=20）
+  - `uv run python scrape.py --retries 3 --retry-base 1.5 --retry-factor 2.0 --retry-max 20`
+
+### 運用補助の例（レジューム/失敗CSV/追記）
+- 既存の出力を読み込み既取得コードをスキップ（レジューム）
+  - `uv run python scrape.py --resume`
+- 失敗銘柄を別CSVに出力
+  - `uv run python scrape.py --failures failures.csv`
+- 既存の出力に追記（ヘッダ重複なし）
+  - `uv run python scrape.py --append`
+- 失敗CSVからの再実行（前回失敗分のみ）
+  - `uv run python scrape.py --from-failures failures.csv --append`
+
 ### 主なオプション
 - `--input`: 入力CSVパス（デフォルト: `codelist.csv`、UTF-8 BOM付、ヘッダ`code`必須）
 - `--output`: 出力CSVパス（デフォルト: `result.csv`）
 - `--sleep`: 取得間隔秒（デフォルト: 1.0）
 - `--limit`: 上位N件のみ処理（0は全件）
+- `--retries`: 一時的失敗時のリトライ回数（デフォルト: 0=無効）
+- `--retry-base`: 指数バックオフの基準秒（デフォルト: 1.0）
+- `--retry-factor`: バックオフ乗数（デフォルト: 1.6）
+- `--retry-max`: 1回の最大待機秒（デフォルト: 15.0）
+- `--jitter-frac`: 通常スリープに対する±割合ジッター（例: 0.3=±30%）
+- `--failures`: 失敗銘柄CSVの出力パス（空文字で無効）
+- `--resume`: 既存 `--output` から既取得コードを読み取りスキップ
+- `--append`: 既存 `--output` に追記（無ければ新規作成しヘッダ出力）
+- `--verbose`: 詳細ログを有効化（リトライの詳細など）
+- `--from-failures`: 失敗CSV（`code` 列必須）から入力コードを読み込み、該当銘柄のみ再実行
 
 ## 入出力仕様
 - 入力CSV: `codelist.csv`
@@ -59,6 +85,10 @@
 - 進捗・警告は `stderr` に出力（CSVは`stdout`には出さない）
 - タイムアウト・解析失敗はスキップして継続、終了時に完了メッセージ
 - UAは一般的なChrome相当を使用（`scrape.py`内で設定）
+- リトライ: タイムアウト/一時的例外は指数バックオフ＋フルジッターで再試行（`--retries`>0 のとき）
+- 非リトライ対象: HTTP 404/410 は恒久的エラーとみなし再試行しない
+- 失敗CSV: `--failures` を指定すると `code,reason` を追記
+- レジューム: `--resume` で既存出力の `code` をスキップ、`--append` で追記運用
 
 ## よくあるトラブルと対処
 - タイムアウト: `scrape.py`のタイムアウト延長、`--sleep` 増加、またはヘッドレスOFFで確認

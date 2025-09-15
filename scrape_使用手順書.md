@@ -24,11 +24,37 @@
 - 全件実行（推奨スリープ例 5秒）
   - `uv run python scrape.py --sleep 5.0`
 
+リトライ・ジッター付きの例
+- 軽めの再試行＋スリープに±30%ジッター
+  - `uv run python scrape.py --sleep 2.0 --retries 2 --jitter-frac 0.3`
+- バックオフを強める（base=1.5, factor=2.0, max=20）
+  - `uv run python scrape.py --retries 3 --retry-base 1.5 --retry-factor 2.0 --retry-max 20`
+
+運用補助の例（レジューム/失敗CSV/追記）
+- 既取得コードをスキップして再開
+  - `uv run python scrape.py --resume`
+- 失敗銘柄の一覧をCSV出力（`code,reason`）
+  - `uv run python scrape.py --failures failures.csv`
+- 既存出力へ追記（ヘッダ重複なし）
+  - `uv run python scrape.py --append`
+- 失敗CSVからの再実行（前回失敗分のみ）
+  - `uv run python scrape.py --from-failures failures.csv --append`
+
 主なオプション
 - `--input`: 入力CSV（既定: `codelist.csv`）
 - `--output`: 出力CSV（既定: `result.csv`）
 - `--sleep`: リクエスト間隔秒（既定: 1.0）
 - `--limit`: 上位N件のみ処理（0は全件）
+- `--retries`: 一時的失敗のリトライ回数（既定: 0=無効）
+- `--retry-base`: バックオフ基準秒（既定: 1.0）
+- `--retry-factor`: 乗数（既定: 1.6）
+- `--retry-max`: 1回の最大待機秒（既定: 15.0）
+- `--jitter-frac`: 通常スリープに±割合のジッター（例: 0.3=±30%）
+- `--failures`: 失敗銘柄CSVの出力パス（空で無効）
+- `--resume`: 既存 `--output` を読み既取得コードをスキップ
+- `--append`: 既存 `--output` に追記（無ければ新規作成）
+- `--verbose`: 詳細ログ（リトライ詳細等）
+- `--from-failures`: 失敗CSV（`code` 列）から対象銘柄のみ再実行
 
 ## 4. 出力仕様
 - 出力ファイル: `result.csv`
@@ -67,6 +93,10 @@
   - `--sleep` を増やす（例: 5.0）
   - `scrape.py` の Playwright タイムアウト値を延長
   - `launch(headless=False)` に変更して挙動確認
+  - `--retries` を指定して指数バックオフで再試行（`--retry-*` で調整）。404/410 は再試行しません
+- 失敗の切り分け
+  - `--failures` で `code,reason` を記録し再実行に活用
+  - `--resume` と組み合わせて未取得分のみ再処理
 - ブラウザ未インストール
   - `uv run --python 3.11 python -m playwright install chromium`
 - CSVが文字化けする
@@ -83,4 +113,3 @@
 - 項目拡張: 決算期、従業員数、所在地 等
 - 個別調整: 銘柄別の除外/採用ワードを設定ファイル化
 - レポート: 空欄項目の集計、失敗コードの別CSV出力
-
