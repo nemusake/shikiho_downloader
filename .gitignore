@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# Environments/IDE
+.venv/
+.DS_Store
+.idea/
+.vscode/
+
+# Scraping outputs
+result.csv
+result - summary.csv
+
+# Playwright caches (if any local)
+playwright/.cache/
+ms-playwright/
